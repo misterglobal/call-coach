@@ -58,7 +58,8 @@ app.use(express.static('public')); // will put dashboard build here
 const wss = new WebSocket.Server({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  if (request.url === '/browser-stream' || request.url === '/call-stream') {
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  if (url.pathname === '/browser-stream' || url.pathname === '/call-stream') {
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
