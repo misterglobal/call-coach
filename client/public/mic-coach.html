@@ -23,6 +23,10 @@
   <div id="coaching-panel">
     <h3>🤖 Live Coaching</h3>
     <div class="coaching-item">
+      <strong>Stage:</strong>
+      <span id="stage" style="text-transform: uppercase; color: #007bff; font-weight: bold;">—</span>
+    </div>
+    <div class="coaching-item">
       <strong>Prospect Concern:</strong>
       <span id="concern">—</span>
     </div>
@@ -42,6 +46,10 @@
       <strong>Talk Ratio:</strong>
       <span id="talk_ratio">—</span>
     </div>
+    <div class="coaching-item">
+      <strong>Momentum:</strong>
+      <span id="momentum">—</span>
+    </div>
   </div>
 
   <script>
@@ -59,10 +67,12 @@
     socket.on('connect_error', (err) => console.error('Socket.IO connection error:', err));
     socket.on('coaching_update', (data) => {
       console.log('Coaching update received:', data);
+      document.getElementById('stage').textContent = data.stage || '—';
       document.getElementById('concern').textContent = data.concern || '—';
       document.getElementById('next_line').textContent = data.next_line || '—';
       document.getElementById('response_tip').textContent = data.response_tip || '—';
       document.getElementById('talk_ratio').textContent = data.talk_ratio || '—';
+      document.getElementById('momentum').textContent = data.momentum || '—';
       const warningRow = document.getElementById('warning-row');
       if (data.warning && data.warning.toLowerCase() !== 'none') {
         document.getElementById('warning').textContent = data.warning;
