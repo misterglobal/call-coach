@@ -60,9 +60,16 @@
     // In production, pass ?backend=https://your-backend.railway.app in the URL
     const params = new URLSearchParams(window.location.search);
     const backendBase = params.get('backend') || 'http://localhost:3028';
+    const token = params.get('token');
     
+    if (!token) {
+      console.warn('No token found in URL. Connection may be rejected by server.');
+    }
+
     // --- Socket.IO: receive coaching updates ---
-    const socket = io(backendBase);
+    const socket = io(backendBase, {
+      auth: { token: token }
+    });
     socket.on('connect', () => console.log('Socket.IO connected to server'));
     socket.on('connect_error', (err) => console.error('Socket.IO connection error:', err));
     socket.on('coaching_update', (data) => {
@@ -111,7 +118,8 @@
 
         const wsProtocol = backendBase.startsWith('https') ? 'wss' : 'ws';
         const wsHost = backendBase.replace(/^https?:\/\//, '');
-        ws = new WebSocket(`${wsProtocol}://${wsHost}/browser-stream`);
+        const wsUrl = `${wsProtocol}://${wsHost}/browser-stream?token=${encodeURIComponent(token || '')}`;
+        ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           updateStatus('Connected — streaming audio...', 'green');

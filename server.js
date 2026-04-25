@@ -9,10 +9,29 @@ const WebSocket = require('ws');
 
 const app = express();
 const server = http.createServer(app);
+// Token validation (Placeholder for Supabase function call later)
+async function validateToken(token) {
+  if (!token) return false;
+  // TODO: Add fetch call to Supabase edge function here
+  // For now, any non-empty token is valid
+  return token.length > 0;
+}
+
 const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
+  }
+});
+
+// Socket.IO Authentication Middleware
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (await validateToken(token)) {
+    next();
+  } else {
+    console.log('Socket.IO connection rejected: Invalid token');
+    next(new Error('Authentication error: Invalid token'));
   }
 });
 
@@ -49,7 +68,15 @@ server.on('upgrade', (request, socket, head) => {
 wss.on('connection', async (ws, req) => {
   console.log(`WebSocket connection attempt: ${req.url}`);
 
-  if (req.url === '/browser-stream') {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const token = url.searchParams.get('token');
+
+  if (url.pathname === '/browser-stream') {
+    if (!(await validateToken(token))) {
+      console.log('WebSocket connection rejected: Invalid token');
+      ws.close(4001, 'Invalid token');
+      return;
+    }
     console.log('Browser mic stream connected');
 
     let streamSid = 'browser-' + Date.now();
@@ -57,7 +84,7 @@ wss.on('connection', async (ws, req) => {
 
     try {
       console.log('Initializing Deepgram connection (direct WebSocket)...');
-      
+
       const dgUrl = 'wss://api.deepgram.com/v1/listen?model=nova-2&language=en&smart_format=true&diarize=true&encoding=linear16&sample_rate=16000&channels=1';
       const deepgramWs = new WebSocket(dgUrl, {
         headers: { 'Authorization': `Token ${process.env.DEEPGRAM_API_KEY}` }
@@ -97,7 +124,7 @@ wss.on('connection', async (ws, req) => {
               const spk = w.speaker !== undefined ? `speaker_${w.speaker}` : 'unknown';
               speakerCounts[spk] = (speakerCounts[spk] || 0) + 1;
             });
-            let dominantSpeaker = Object.keys(speakerCounts).sort((a,b) => speakerCounts[b] - speakerCounts[a])[0];
+            let dominantSpeaker = Object.keys(speakerCounts).sort((a, b) => speakerCounts[b] - speakerCounts[a])[0];
             let speakerLabel = dominantSpeaker === 'speaker_0' ? 'prospect' : 'you';
 
             console.log(`[${streamSid}] ${speakerLabel}: ${transcript}`);
@@ -133,7 +160,7 @@ wss.on('connection', async (ws, req) => {
   }
 
   // Existing Twilio /call-stream handler
-  if (req.url === '/call-stream') {
+  if (url.pathname === '/call-stream') {
     console.log('Twilio stream connected');
     let streamSid = null;
     let deepgramLive = null;
