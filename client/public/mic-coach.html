@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Mic to Coach</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    #coaching-panel { margin-top: 20px; }
+    .coaching-item { margin-bottom: 12px; }
+    .coaching-item strong { display: block; margin-bottom: 2px; }
+    .next-line-box { background: #f0f0f0; padding: 10px; border-radius: 8px; }
+    .warning { color: red; }
+  </style>
+  <!-- Socket.IO client for receiving coaching updates -->
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+<body>
+  <h2>🎤 Speakerphone Call Coach</h2>
+  <button id="startBtn">Start Listening</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <p id="status">Not connected</p>
+
+  <div id="coaching-panel">
+    <h3>🤖 Live Coaching</h3>
+    <div class="coaching-item">
+      <strong>Prospect Concern:</strong>
+      <span id="concern">—</span>
+    </div>
+    <div class="coaching-item">
+      <strong>What to say next:</strong>
+      <div class="next-line-box" id="next_line">—</div>
+    </div>
+    <div class="coaching-item">
+      <strong>Tip:</strong>
+      <span id="response_tip">—</span>
+    </div>
+    <div class="coaching-item warning" id="warning-row" style="display:none;">
+      <strong>⚠️ Warning:</strong>
+      <span id="warning"></span>
+    </div>
+    <div class="coaching-item">
+      <strong>Talk Ratio:</strong>
+      <span id="talk_ratio">—</span>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let audioContext, processor, source, micStream;
+
+    // --- Configuration: Backend URL ---
+    // In production, pass ?backend=https://your-backend.railway.app in the URL
+    const params = new URLSearchParams(window.location.search);
+    const backendBase = params.get('backend') || 'http://localhost:3028';
+    
+    // --- Socket.IO: receive coaching updates ---
+    const socket = io(backendBase);
+    socket.on('connect', () => console.log('Socket.IO connected to server'));
+    socket.on('connect_error', (err) => console.error('Socket.IO connection error:', err));
+    socket.on('coaching_update', (data) => {
+      console.log('Coaching update received:', data);
+      document.getElementById('concern').textContent = data.concern || '—';
+      document.getElementById('next_line').textContent = data.next_line || '—';
+      document.getElementById('response_tip').textContent = data.response_tip || '—';
+      document.getElementById('talk_ratio').textContent = data.talk_ratio || '—';
+      const warningRow = document.getElementById('warning-row');
+      if (data.warning && data.warning.toLowerCase() !== 'none') {
+        document.getElementById('warning').textContent = data.warning;
+        warningRow.style.display = 'block';
+      } else {
+        warningRow.style.display = 'none';
+      }
+    });
+
+    // --- Status display ---
+    function updateStatus(message, color = 'black') {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = message;
+      statusEl.style.color = color;
+      console.log('Status:', message);
+    }
+
+    function cleanup() {
+      if (processor) { processor.disconnect(); processor = null; }
+      if (source) { source.disconnect(); source = null; }
+      if (audioContext) { audioContext.close(); audioContext = null; }
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+      if (ws) { ws.close(); ws = null; }
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    }
+
+    // --- Start: request mic, open WebSocket, stream audio ---
+    document.getElementById('startBtn').onclick = async () => {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        updateStatus('Mic access granted, connecting...', 'orange');
+
+        const wsProtocol = backendBase.startsWith('https') ? 'wss' : 'ws';
+        const wsHost = backendBase.replace(/^https?:\/\//, '');
+        ws = new WebSocket(`${wsProtocol}://${wsHost}/browser-stream`);
+
+        ws.onopen = () => {
+          updateStatus('Connected — streaming audio...', 'green');
+
+          audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+          source = audioContext.createMediaStreamSource(micStream);
+          processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+          let chunkCount = 0;
+          processor.onaudioprocess = (e) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              const inputData = e.inputBuffer.getChannelData(0);
+              const pcm16 = new Int16Array(inputData.length);
+              for (let i = 0; i < inputData.length; i++) {
+                let s = Math.max(-1, Math.min(1, inputData[i]));
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+              }
+              ws.send(pcm16.buffer);
+              chunkCount++;
+              if (chunkCount % 50 === 0) console.log('Sent 50 chunks of audio...');
+            }
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+        };
+
+        ws.onclose = (event) => {
+          updateStatus(`WebSocket closed (code: ${event.code})`, 'red');
+          cleanup();
+        };
+
+        ws.onerror = (error) => {
+          updateStatus('WebSocket error — check server', 'red');
+          console.error('WebSocket error:', error);
+          cleanup();
+        };
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+      } catch (err) {
+        console.error('Error accessing microphone:', err);
+        updateStatus('Microphone access denied', 'red');
+      }
+    };
+
+    document.getElementById('stopBtn').onclick = () => {
+      cleanup();
+      updateStatus('Stopped.', 'black');
+    };
+  </script>
+</body>
+</html>
