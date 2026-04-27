@@ -1,102 +1,548 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <title>Mic to Coach</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    #coaching-panel { margin-top: 20px; }
-    .coaching-item { margin-bottom: 12px; }
-    .coaching-item strong { display: block; margin-bottom: 2px; }
-    .next-line-box { background: #f0f0f0; padding: 10px; border-radius: 8px; }
-    .warning { color: red; }
-  </style>
-  <!-- Socket.IO client for receiving coaching updates -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Call Assist</title>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      /* Dark Theme */
+      --bg-base: #0F111A;
+      --bg-panel: #1E2130;
+      --bg-panel-hover: #2A2D3D;
+      --border-color: #2D3142;
+      
+      --text-primary: #FFFFFF;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      
+      --accent-purple: #8B5CF6;
+      --accent-blue: #3B82F6;
+      --accent-green: #10B981;
+      --accent-orange: #F59E0B;
+      --accent-red: #EF4444;
+      
+      --glow-purple: rgba(139, 92, 246, 0.15);
+      --glow-green: rgba(16, 185, 129, 0.15);
+    }
+
+    [data-theme="light"] {
+      /* Light Theme */
+      --bg-base: #F8FAFC;
+      --bg-panel: #FFFFFF;
+      --bg-panel-hover: #F1F5F9;
+      --border-color: #E2E8F0;
+      
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      
+      --accent-purple: #7C3AED;
+      --accent-blue: #2563EB;
+      --accent-green: #059669;
+      --accent-orange: #D97706;
+      --accent-red: #DC2626;
+      
+      --glow-purple: rgba(124, 58, 237, 0.05);
+      --glow-green: rgba(5, 150, 105, 0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Layout */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 1.5rem;
+      padding: 1.5rem 2rem;
+      flex: 1;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Common Card Styles */
+    .card {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Typography */
+    .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Colors */
+    .text-purple { color: var(--accent-purple); }
+    .text-blue { color: var(--accent-blue); }
+    .text-green { color: var(--accent-green); }
+    .text-orange { color: var(--accent-orange); }
+    .text-red { color: var(--accent-red); }
+
+    /* specific sections */
+    .next-line-card {
+      background: linear-gradient(145deg, var(--bg-panel), var(--glow-purple));
+      border-color: rgba(139, 92, 246, 0.3);
+      position: relative;
+    }
+    .next-line-card h2 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 1.5rem;
+      min-height: 3rem;
+    }
+    .next-line-tip {
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .data-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      min-height: 2rem;
+    }
+    .data-subtext {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    /* Live Transcript */
+    .transcript-section {
+      margin-top: 1.5rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 300px;
+    }
+    .transcript-log {
+      flex: 1;
+      max-height: 350px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding-right: 1rem;
+    }
+    .transcript-log::-webkit-scrollbar { width: 6px; }
+    .transcript-log::-webkit-scrollbar-track { background: transparent; }
+    .transcript-log::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    
+    .transcript-line {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+    }
+    .speaker { font-weight: 600; width: 80px; flex-shrink: 0; text-transform: capitalize; }
+    .speaker.prospect { color: var(--text-primary); }
+    .speaker.you { color: var(--accent-purple); }
+    .timestamp { color: var(--text-muted); font-size: 0.75rem; width: 60px; flex-shrink: 0; padding-top: 0.15rem; }
+    .text { color: var(--text-secondary); flex: 1; }
+
+    /* Footer */
+    .footer {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      gap: 0.5rem;
+    }
+
+    /* Sidebar Insights */
+    .insight-item {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .insight-item:last-child { border-bottom: none; }
+    .insight-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .insight-value { font-weight: 600; margin-bottom: 0.25rem; font-size: 1rem; text-transform: capitalize; }
+
+    /* Buttons */
+    .btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--bg-panel-hover); }
+    
+    .btn-action {
+      background: var(--accent-green);
+      color: white;
+      border: none;
+    }
+    .btn-action:hover { background: #059669; }
+    
+    .btn-danger {
+      background: transparent;
+      border-color: rgba(239, 68, 68, 0.5);
+      color: var(--accent-red);
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+    
+    /* Charts & Visuals */
+    .donut-container {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent-blue) var(--ratio, 60%), var(--border-color) 0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .donut-inner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-panel);
+    }
+    
+    .sparkline { width: 80px; height: 30px; }
+    .sparkline polyline {
+      fill: none;
+      stroke: var(--spark-color, var(--accent-green));
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    
+    /* Utility */
+    .flex-row { display: flex; justify-content: space-between; align-items: center; }
+    .status-badge {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .hidden { display: none !important; }
+
+  </style>
 </head>
 <body>
-  <h2>🎤 Speakerphone Call Coach</h2>
-  <button id="startBtn">Start Listening</button>
-  <button id="stopBtn" disabled>Stop</button>
-  <p id="status">Not connected</p>
 
-  <div id="coaching-panel">
-    <h3>🤖 Live Coaching</h3>
-    <div class="coaching-item">
-      <strong>Stage:</strong>
-      <span id="stage" style="text-transform: uppercase; color: #007bff; font-weight: bold;">—</span>
+  <div class="header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <h1 style="font-size: 1.25rem; font-weight: 600;">Live Call Assist</h1>
+      <span class="status-badge hidden" id="liveBadge">LIVE</span>
+      <span style="color: var(--text-muted); font-size: 0.875rem; margin-left: 1rem;">Real-time coaching while you're on the call</span>
     </div>
-    <div class="coaching-item">
-      <strong>Prospect Concern:</strong>
-      <span id="concern">—</span>
+    <div style="display: flex; gap: 1rem;">
+      <button class="btn" id="themeToggleBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        Theme
+      </button>
+      <button class="btn btn-action" id="sessionBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        <span>Start Session</span>
+      </button>
     </div>
-    <div class="coaching-item">
-      <strong>What to say next:</strong>
-      <div class="next-line-box" id="next_line">—</div>
+  </div>
+
+  <div class="container">
+    <div class="left-col" style="display: flex; flex-direction: column;">
+      <!-- Suggested Next Line -->
+      <div class="card next-line-card">
+        <div class="label text-purple">✨ Suggested Next Line</div>
+        <h2 id="ui-next-line">Waiting for conversation to begin...</h2>
+        <div>
+          <div class="next-line-tip">
+             <span id="ui-response-tip">Speak to start receiving real-time insights.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid 2x2 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="label text-orange">⚠️ Detected Concern</div>
+          <div class="data-value" id="ui-concern">—</div>
+          <div class="data-subtext" id="ui-stage" style="text-transform: capitalize;">Stage: —</div>
+        </div>
+        
+        <div class="card flex-row">
+          <div>
+            <div class="label text-blue">○ Talk Ratio</div>
+            <div class="data-value" id="ui-talk-ratio">—</div>
+            <div class="data-subtext">You / Prospect</div>
+          </div>
+          <div class="donut-container" id="donut-chart" style="--ratio: 0%;">
+            <div class="donut-inner"></div>
+          </div>
+        </div>
+        
+        <div class="card flex-row" style="grid-column: span 2;">
+          <div>
+            <div class="label text-green" id="momentum-label">↗ Momentum</div>
+            <div class="data-value text-green" id="ui-momentum">—</div>
+            <div class="data-subtext">Call trajectory</div>
+          </div>
+          <svg class="sparkline" viewBox="0 0 100 30">
+            <polyline points="0,15 20,15 40,15 60,15 80,15 100,15" id="sparkline-path"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Transcript -->
+      <div class="card transcript-section">
+        <div class="label" style="color: var(--text-secondary);">
+          <span style="color: var(--accent-green);">●</span> Live Transcript &nbsp;<span style="font-weight: 400; color: var(--text-muted); text-transform: none;">Auto-updating</span>
+        </div>
+        <div class="transcript-log" id="transcript-log">
+          <!-- Lines injected here via JS -->
+        </div>
+      </div>
+
+      <div class="footer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        Your call is private and secure. Audio is not recorded.
+      </div>
     </div>
-    <div class="coaching-item">
-      <strong>Tip:</strong>
-      <span id="response_tip">—</span>
-    </div>
-    <div class="coaching-item warning" id="warning-row" style="display:none;">
-      <strong>⚠️ Warning:</strong>
-      <span id="warning"></span>
-    </div>
-    <div class="coaching-item">
-      <strong>Talk Ratio:</strong>
-      <span id="talk_ratio">—</span>
-    </div>
-    <div class="coaching-item">
-      <strong>Momentum:</strong>
-      <span id="momentum">—</span>
+
+    <div class="right-col" style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <div class="card" style="padding: 0;">
+        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em;">LIVE INSIGHTS</div>
+        
+        <div class="insight-item">
+          <div class="insight-title text-orange">⚠️ Concern</div>
+          <div class="insight-value" id="side-concern">—</div>
+        </div>
+        
+        <div class="insight-item">
+          <div class="insight-title text-blue">○ Talk Ratio</div>
+          <div class="insight-value" id="side-talk-ratio">—</div>
+        </div>
+        
+        <div class="insight-item">
+          <div class="insight-title text-green" id="side-momentum-title">↗ Momentum</div>
+          <div class="insight-value text-green" id="side-momentum">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">Session Time</div>
+        <div class="data-value" id="session-timer">00:00</div>
+        <div class="data-subtext" id="session-started">Not started</div>
+      </div>
+
+      <button class="btn" style="justify-content: center; padding: 1rem; color: var(--accent-purple); border-color: rgba(139, 92, 246, 0.5);">
+        View Call Summary (Beta)
+      </button>
     </div>
   </div>
 
   <script>
     let ws = null;
     let audioContext, processor, source, micStream;
+    let isSessionActive = false;
+    let sessionInterval = null;
+    let sessionSeconds = 0;
+
+    // --- Theme Toggle ---
+    const themeBtn = document.getElementById('themeToggleBtn');
+    themeBtn.onclick = () => {
+      const html = document.documentElement;
+      if (html.getAttribute('data-theme') === 'dark') {
+        html.setAttribute('data-theme', 'light');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+      }
+    };
 
     // --- Configuration: Backend URL ---
-    // In production, pass ?backend=https://your-backend.railway.app in the URL
     const params = new URLSearchParams(window.location.search);
     const backendBase = params.get('backend') || 'http://localhost:3028';
     const token = params.get('token');
     
-    if (!token) {
-      console.warn('No token found in URL. Connection may be rejected by server.');
-    }
+    if (!token) console.warn('No token found in URL.');
 
-    // --- Socket.IO: receive coaching updates ---
-    const socket = io(backendBase, {
-      auth: { token: token }
-    });
+    // --- Socket.IO: receive coaching & transcript updates ---
+    const socket = io(backendBase, { auth: { token: token } });
     socket.on('connect', () => console.log('Socket.IO connected to server'));
-    socket.on('connect_error', (err) => console.error('Socket.IO connection error:', err));
+    
     socket.on('coaching_update', (data) => {
       console.log('Coaching update received:', data);
-      document.getElementById('stage').textContent = data.stage || '—';
-      document.getElementById('concern').textContent = data.concern || '—';
-      document.getElementById('next_line').textContent = data.next_line || '—';
-      document.getElementById('response_tip').textContent = data.response_tip || '—';
-      document.getElementById('talk_ratio').textContent = data.talk_ratio || '—';
-      document.getElementById('momentum').textContent = data.momentum || '—';
-      const warningRow = document.getElementById('warning-row');
-      if (data.warning && data.warning.toLowerCase() !== 'none') {
-        document.getElementById('warning').textContent = data.warning;
-        warningRow.style.display = 'block';
+      
+      document.getElementById('ui-next-line').textContent = `"${data.next_line || '...'}"`;
+      document.getElementById('ui-response-tip').textContent = data.response_tip || 'Listening for context...';
+      
+      const concernText = data.concern || '—';
+      document.getElementById('ui-concern').textContent = concernText;
+      document.getElementById('side-concern').textContent = concernText.length > 20 ? concernText.substring(0,20)+'...' : concernText;
+      
+      document.getElementById('ui-stage').textContent = `Stage: ${data.stage || '—'}`;
+      
+      // Talk Ratio
+      const ratioStr = data.talk_ratio || '50/50';
+      document.getElementById('ui-talk-ratio').textContent = ratioStr;
+      document.getElementById('side-talk-ratio').textContent = ratioStr;
+      const youRatio = parseInt(ratioStr.split('/')[0]) || 50;
+      document.getElementById('donut-chart').style.setProperty('--ratio', `${youRatio}%`);
+      
+      // Momentum
+      const momentumStr = data.momentum || 'neutral';
+      document.getElementById('ui-momentum').textContent = momentumStr;
+      document.getElementById('side-momentum').textContent = momentumStr;
+      
+      const sparkline = document.getElementById('sparkline-path');
+      const momLabel = document.getElementById('momentum-label');
+      const momText = document.getElementById('ui-momentum');
+      const sideMomText = document.getElementById('side-momentum');
+      const sideMomTitle = document.getElementById('side-momentum-title');
+      
+      if (momentumStr.toLowerCase().includes('improving')) {
+        sparkline.style.setProperty('--spark-color', 'var(--accent-green)');
+        sparkline.setAttribute('points', '0,25 20,20 40,25 60,10 80,15 100,5');
+        momLabel.className = 'label text-green';
+        momText.className = 'data-value text-green';
+        sideMomTitle.className = 'insight-title text-green';
+        sideMomText.className = 'insight-value text-green';
+      } else if (momentumStr.toLowerCase().includes('declining')) {
+        sparkline.style.setProperty('--spark-color', 'var(--accent-red)');
+        sparkline.setAttribute('points', '0,5 20,10 40,5 60,20 80,15 100,25');
+        momLabel.className = 'label text-red';
+        momText.className = 'data-value text-red';
+        sideMomTitle.className = 'insight-title text-red';
+        sideMomText.className = 'insight-value text-red';
       } else {
-        warningRow.style.display = 'none';
+        sparkline.style.setProperty('--spark-color', 'var(--text-muted)');
+        sparkline.setAttribute('points', '0,15 20,10 40,20 60,15 80,10 100,15');
+        momLabel.className = 'label';
+        momText.className = 'data-value';
+        sideMomTitle.className = 'insight-title';
+        sideMomText.className = 'insight-value';
       }
     });
 
-    // --- Status display ---
-    function updateStatus(message, color = 'black') {
-      const statusEl = document.getElementById('status');
-      statusEl.textContent = message;
-      statusEl.style.color = color;
-      console.log('Status:', message);
+    socket.on('transcript_update', (data) => {
+      const log = document.getElementById('transcript-log');
+      const timeStr = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      const line = document.createElement('div');
+      line.className = 'transcript-line';
+      line.innerHTML = `
+        <div class="speaker ${data.speaker}">${data.speaker}</div>
+        <div class="timestamp">${timeStr}</div>
+        <div class="text">${data.text}</div>
+      `;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight; // Auto-scroll
+    });
+
+    // --- Session Timer ---
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
     }
 
+    function startSessionUI() {
+      document.getElementById('liveBadge').classList.remove('hidden');
+      const btn = document.getElementById('sessionBtn');
+      btn.className = 'btn btn-danger';
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg><span>End Session</span>`;
+      
+      const now = new Date();
+      document.getElementById('session-started').textContent = `Started at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      
+      sessionSeconds = 0;
+      document.getElementById('session-timer').textContent = "00:00";
+      sessionInterval = setInterval(() => {
+        sessionSeconds++;
+        document.getElementById('session-timer').textContent = formatTime(sessionSeconds);
+      }, 1000);
+      
+      // Clear transcript
+      document.getElementById('transcript-log').innerHTML = '';
+      document.getElementById('ui-next-line').textContent = '"..."';
+      document.getElementById('ui-response-tip').textContent = 'Listening for context...';
+    }
+
+    function endSessionUI() {
+      document.getElementById('liveBadge').classList.add('hidden');
+      const btn = document.getElementById('sessionBtn');
+      btn.className = 'btn btn-action';
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span>Start Session</span>`;
+      
+      clearInterval(sessionInterval);
+    }
+
+    // --- Mic & WebSocket Logic ---
     function cleanup() {
       if (processor) { processor.disconnect(); processor = null; }
       if (source) { source.disconnect(); source = null; }
@@ -106,29 +552,32 @@
         micStream = null;
       }
       if (ws) { ws.close(); ws = null; }
-      document.getElementById('startBtn').disabled = false;
-      document.getElementById('stopBtn').disabled = true;
+      isSessionActive = false;
+      endSessionUI();
     }
 
-    // --- Start: request mic, open WebSocket, stream audio ---
-    document.getElementById('startBtn').onclick = async () => {
+    document.getElementById('sessionBtn').onclick = async () => {
+      if (isSessionActive) {
+        cleanup();
+        return;
+      }
+
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        updateStatus('Mic access granted, connecting...', 'orange');
-
+        
         const wsProtocol = backendBase.startsWith('https') ? 'wss' : 'ws';
         const wsHost = backendBase.replace(/^https?:\/\//, '');
         const wsUrl = `${wsProtocol}://${wsHost}/browser-stream?token=${encodeURIComponent(token || '')}`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          updateStatus('Connected — streaming audio...', 'green');
+          isSessionActive = true;
+          startSessionUI();
 
           audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
           source = audioContext.createMediaStreamSource(micStream);
           processor = audioContext.createScriptProcessor(4096, 1, 1);
 
-          let chunkCount = 0;
           processor.onaudioprocess = (e) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               const inputData = e.inputBuffer.getChannelData(0);
@@ -138,8 +587,6 @@
                 pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
               }
               ws.send(pcm16.buffer);
-              chunkCount++;
-              if (chunkCount % 50 === 0) console.log('Sent 50 chunks of audio...');
             }
           };
 
@@ -147,28 +594,16 @@
           processor.connect(audioContext.destination);
         };
 
-        ws.onclose = (event) => {
-          updateStatus(`WebSocket closed (code: ${event.code})`, 'red');
-          cleanup();
-        };
-
+        ws.onclose = () => cleanup();
         ws.onerror = (error) => {
-          updateStatus('WebSocket error — check server', 'red');
           console.error('WebSocket error:', error);
           cleanup();
         };
 
-        document.getElementById('startBtn').disabled = true;
-        document.getElementById('stopBtn').disabled = false;
       } catch (err) {
         console.error('Error accessing microphone:', err);
-        updateStatus('Microphone access denied', 'red');
+        alert('Microphone access denied or error occurred.');
       }
-    };
-
-    document.getElementById('stopBtn').onclick = () => {
-      cleanup();
-      updateStatus('Stopped.', 'black');
     };
   </script>
 </body>

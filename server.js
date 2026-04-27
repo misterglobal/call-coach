@@ -132,6 +132,14 @@ wss.on('connection', async (ws, req) => {
             transcriptArray = callTranscripts.get(streamSid) || [];
             transcriptArray.push({ speaker: speakerLabel, text: transcript });
             callTranscripts.set(streamSid, transcriptArray);
+            
+            // Emit transcript immediately to the UI
+            io.emit('transcript_update', {
+              streamSid,
+              speaker: speakerLabel,
+              text: transcript,
+              timestamp: Date.now()
+            });
           }
         } catch (e) {
           console.error('Error parsing Deepgram message:', e.message);
@@ -200,6 +208,13 @@ wss.on('connection', async (ws, req) => {
           transcriptArray.push({ speaker, text });
           // Store in callTranscripts map for potential access
           callTranscripts.set(streamSid, transcriptArray);
+          
+          io.emit('transcript_update', {
+            streamSid,
+            speaker,
+            text,
+            timestamp: Date.now()
+          });
           // Trigger coaching after a new customer line? Just schedule it periodically
         }
       });
